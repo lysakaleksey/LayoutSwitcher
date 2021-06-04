@@ -6,66 +6,65 @@ using System.Drawing;
 
 namespace LayoutSwitcher
 {
-    static class Program
+    internal static class Program
     {
-        const int HC_ACTION = 0;
-        const int WH_KEYBOARD_LL = 13;
-        const int WM_KEYDOWN = 0x0100;
-        const int WM_KEYUP = 0x0101;
-        static IntPtr HookHandle = IntPtr.Zero;
-        static Bar Bar;
-
-        static Boolean kWin, kSpace;
+        private const int HcAction = 0;
+        private const int WhKeyboardLl = 13;
+        private const int WmKeydown = 0x0100;
+        private const int WmKeyup = 0x0101;
+        private static IntPtr _hookHandle = IntPtr.Zero;
+        private static Bar _bar;
+        private static bool _kWin, _kSpace;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        static extern IntPtr SetWindowsHookEx(int idHook, KbHook lpfn, IntPtr hMod, uint dwThreadId);
+        private static extern IntPtr SetWindowsHookEx(int idHook, KbHook lpfn, IntPtr hMod, uint dwThreadId);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        static extern IntPtr GetModuleHandle(string lpModuleName);
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         [DllImport("user32.dll")]
-        public static extern IntPtr GetForegroundWindow();
+        private static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll")]
         private static extern bool PostMessage(IntPtr hhwnd, uint msg, IntPtr wparam, IntPtr lparam);
 
         [DllImport("user32.dll")]
-        static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
+        private static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
 
         [DllImport("user32.dll")]
-        static extern short GetAsyncKeyState(Keys vKey);
+        private static extern short GetAsyncKeyState(Keys vKey);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
 
         [STAThread]
-        static void Main()
+        private static void Main()
         {
-            kWin = false;
-            kSpace = false;
+            _kWin = false;
+            _kSpace = false;
             try
             {
                 using (var proc = Process.GetCurrentProcess())
                 using (var curModule = proc.MainModule)
                 {
                     var moduleHandle = GetModuleHandle(curModule.ModuleName);
-                    HookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, IgnoreWin_Space, moduleHandle, 0);
+                    _hookHandle = SetWindowsHookEx(WhKeyboardLl, IgnoreWin_Space, moduleHandle, 0);
                 }
-                Bar = new Bar();
+                _bar = new Bar();
                 BuildMenu();
                 Application.Run();
             }
             finally
             {
-                UnhookWindowsHookEx(HookHandle);
+                UnhookWindowsHookEx(_hookHandle);
             }
         }
 
-        static void BuildMenu()
+        private static void BuildMenu()
         {
             NotifyIcon notifyIcon1 = new NotifyIcon();
             ContextMenuStrip contextMenuStrip1 = new ContextMenuStrip();
@@ -89,7 +88,7 @@ namespace LayoutSwitcher
             // 
             notifyIcon1.ContextMenuStrip = contextMenuStrip1;
             notifyIcon1.Icon = Properties.Resources.StatusIcon;
-            notifyIcon1.Text = "KeyboardLayoutRetainer";
+            notifyIcon1.Text = "LayoutSwitcher";
             notifyIcon1.Visible = true;
         }
 
@@ -101,70 +100,70 @@ namespace LayoutSwitcher
 
         static IntPtr IgnoreWin_Space(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            Boolean spacePressed = false;
+            bool spacePressed = false;
             var keyInfo = (KbHookParam)Marshal.PtrToStructure(lParam, typeof(KbHookParam));
 
-            if (nCode == HC_ACTION)
+            if (nCode == HcAction)
             {
-                if ((int)wParam == WM_KEYDOWN)
+                if ((int)wParam == WmKeydown)
                 {
                     if (keyInfo.VkCode == (int)Keys.Space)
                     {
                         spacePressed = true;
-                        kSpace = true;
+                        _kSpace = true;
                     }
                     else
                     {
-                        kSpace = false;
+                        _kSpace = false;
                     }
 
                     // нажат одновременно левый виндовс
                     if (GetAsyncKeyState(Keys.LWin) < 0)
                     {
-                        kWin = true;
+                        _kWin = true;
                     }
                     else
                     {
-                        kWin = false;
+                        _kWin = false;
                     }
 
-                    if (kWin && kSpace)
+                    if (_kWin && _kSpace)
                     {
                         if (spacePressed)
                         {
-                            Bar.SetLanguage();
-                            Bar.Show(); // сбивает фокус, пофиксим в конструкторе
+                            _bar.SetLanguage();
+                            _bar.Show(); // сбивает фокус, пофиксим в конструкторе
                             return (IntPtr)1; //just ignore the key press
                         }
                     }
                 }
             }
-            if ((int)wParam == WM_KEYUP)
+            if ((int)wParam == WmKeyup)
             {
                 if (keyInfo.VkCode == (int)Keys.LWin)
                 {
-                    kWin = false;
-                    Bar.DoHide();
-                    string HEX = Bar.GetHex();
-                    uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
-                    uint KLF_ACTIVATE = 1;
-                    PostMessage(GetForegroundWindow(), WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(HEX, KLF_ACTIVATE));
+                    _kWin = false;
+                    _bar.DoHide();
+                    var hex = _bar.GetHex();
+                    const uint wmInputLangChangeRequest = 0x0050;
+                    const uint KLF_ACTIVATE = 1;
+                    PostMessage(GetForegroundWindow(), wmInputLangChangeRequest, IntPtr.Zero, LoadKeyboardLayout(hex, KLF_ACTIVATE));
                 }
             }
 
-            return CallNextHookEx(HookHandle, nCode, wParam, lParam);
+            return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
         }
 
-        delegate IntPtr KbHook(int nCode, IntPtr wParam, [In] IntPtr lParam);
+        private delegate IntPtr KbHook(int nCode, IntPtr wParam, [In] IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
-        struct KbHookParam
+        private readonly struct KbHookParam
         {
             public readonly int VkCode;
-            public readonly int ScanCode;
-            public readonly int Flags;
-            public readonly int Time;
-            public readonly IntPtr Extra;
+            private readonly int ScanCode;
+            private readonly int Flags;
+            private readonly int Time;
+            private readonly IntPtr Extra;
         }
     }
 }
