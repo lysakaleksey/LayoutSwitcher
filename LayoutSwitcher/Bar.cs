@@ -34,20 +34,18 @@ namespace LayoutSwitcher
             Debug.WriteLine("Bar. Final context " + _app);
         }
 
-        public SwitchContext DoHide()
+        public String DoHide()
         {
             Debug.WriteLine("DoHide. Input " + _app);
+
             var layoutId = _languages[_app.Curr].Culture.KeyboardLayoutId;
             var layoutHex = layoutId.ToString("X8");
             _app.Counter = 0;
 
-            var switchContext = new SwitchContext {LayoutId = layoutId, LayoutHex = layoutHex};
-
             Hide();
 
-            Debug.WriteLine("DoHide. Output " + switchContext);
-
-            return switchContext;
+            Debug.WriteLine("DoHide. Output " + layoutHex);
+            return layoutHex;
         }
 
         public void SwitchLanguage(IntPtr appId)
@@ -65,15 +63,32 @@ namespace LayoutSwitcher
             }
 
             lblLanguage.Text = _languages[_app.Curr].Culture.Parent.NativeName.ToUpper();
-            Debug.WriteLine("SwitchLanguage. Old language " + lblLanguage.Text);
-
+            //Debug.WriteLine("SwitchLanguage. Old language " + lblLanguage.Text);
+            
             _app.Counter++;
+            if (_app.Counter >= 2)
+            {
+                Show();
+            }
+           
+            // _app.Prev = _app.Curr;
+            // if (_app.Curr < _languages.Count - 1)
+            // {
+            //     _app.Curr += 1;
+            //     Debug.WriteLine("SwitchLanguage. Case 2: " + _app);
+            // }
+            // else
+            // {
+            //     _app.Curr = 0;
+            //     Debug.WriteLine("SwitchLanguage. Case 3: " + _app);
+            // }
+            
             if (_app.Counter == 1) // Pick previous
             {
                 var prevIndex = _app.Prev;
                 _app.Prev = _app.Curr;
                 _app.Curr = prevIndex;
-                Debug.WriteLine("SwitchLanguage. Case 1 " + _app);
+                Debug.WriteLine("SwitchLanguage. Swap " + _app);
             }
             else // Pressed second time, need to pick next in the list
             {
@@ -81,12 +96,12 @@ namespace LayoutSwitcher
                 if (_app.Curr < _languages.Count - 1)
                 {
                     _app.Curr += 1;
-                    Debug.WriteLine("SwitchLanguage. Case 2: " + _app);
+                    Debug.WriteLine("SwitchLanguage. Next: " + _app);
                 }
                 else
                 {
                     _app.Curr = 0;
-                    Debug.WriteLine("SwitchLanguage. Case 3: " + _app);
+                    Debug.WriteLine("SwitchLanguage. Start: " + _app);
                 }
             }
 

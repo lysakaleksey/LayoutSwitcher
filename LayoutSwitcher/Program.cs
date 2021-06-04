@@ -90,7 +90,11 @@ namespace LayoutSwitcher
                             Debug.WriteLine("Program. Left Win + Space pressed");
                             var appId = Helper.GetForegroundWindow();
                             _bar.SwitchLanguage(appId);
-                            _bar.Show();
+                            // if (!_bar.Visible)
+                            // {
+                            //     _bar.Show();
+                            // }
+
                             return (IntPtr) 1; //just ignore the key press
                         }
                     }
@@ -102,13 +106,17 @@ namespace LayoutSwitcher
                 if (keyInfo.VkCode == (int) Keys.LWin || keyInfo.VkCode == (int) Keys.RWin)
                 {
                     _kWin = false;
-                    if (_bar.Visible)
-                    {
-                        var switchContext = _bar.DoHide();
-                        var layout = Helper.LoadKeyboardLayout(switchContext.LayoutHex, KlfActivate);
-                        Helper.PostMessage(Helper.GetForegroundWindow(), WmInputLangChangeRequest, IntPtr.Zero, layout);
-                        Debug.WriteLine("Program. Changed Keyboard Language " + switchContext);
-                    }
+                    var layoutHex = _bar.DoHide();
+                    var layoutPtr = Helper.LoadKeyboardLayout(layoutHex, KlfActivate);
+                    Helper.PostMessage(Helper.GetForegroundWindow(), WmInputLangChangeRequest, IntPtr.Zero, layoutPtr);
+                    Debug.WriteLine("Program. Changed Keyboard Language to " + layoutHex);
+                    // if (_bar.Visible)
+                    // {
+                    //     var layoutHex = _bar.DoHide();
+                    //     var layoutPtr = Helper.LoadKeyboardLayout(layoutHex, KlfActivate);
+                    //     Helper.PostMessage(Helper.GetForegroundWindow(), WmInputLangChangeRequest, IntPtr.Zero, layoutPtr);
+                    //     Debug.WriteLine("Program. Changed Keyboard Language to " + layoutHex);
+                    // }
                 }
             }
 
