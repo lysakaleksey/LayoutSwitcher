@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Drawing;
 
-namespace InputLanguage2
+namespace LayoutSwitcher
 {
     static class Program
     {

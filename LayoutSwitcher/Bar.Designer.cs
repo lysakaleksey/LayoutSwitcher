@@ -1,4 +1,4 @@
-﻿namespace InputLanguage2
+﻿namespace LayoutSwitcher
 {
     partial class Bar
     {

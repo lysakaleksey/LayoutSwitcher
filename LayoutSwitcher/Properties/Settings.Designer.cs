@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace InputLanguage2.Properties
+namespace LayoutSwitcher.Properties
 {
 
 

@@ -4,7 +4,7 @@ using System.Windows.Forms;
 using System.Globalization;
 using System.Diagnostics;
 
-namespace InputLanguage2
+namespace LayoutSwitcher
 {
     public partial class Bar : Form
     {
