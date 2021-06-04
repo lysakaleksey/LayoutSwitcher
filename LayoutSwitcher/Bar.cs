@@ -1,104 +1,122 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace LayoutSwitcher
 {
     public partial class Bar : Form
     {
-        List<InputLanguage> inputLanguages;
-        //List<string> langTitles;
-        //List<string> langCodes;
-        string retHex;
-        int prev_index = -1;
-        int counter = 0;
-        int pos = 0;
-
+        private readonly Dictionary<IntPtr, AppLangContext> _contexts;
+        private readonly List<InputLanguage> _languages;
+        private AppLangContext _app;
 
         // Show a Form without stealing focus
-        protected override bool ShowWithoutActivation
-        {
-            get { return true; }
-        }
+        protected override bool ShowWithoutActivation => true;
 
-        public Bar()
+        public Bar(IntPtr appId)
         {
             InitializeComponent();
-
-            inputLanguages = new List<InputLanguage>();
-            //langTitles = new List<string>();
-            //langCodes = new List<string>();
+            _contexts = new Dictionary<IntPtr, AppLangContext>();
+            _languages = new List<InputLanguage>();
             foreach (InputLanguage lang in InputLanguage.InstalledInputLanguages)
             {
-                string title = lang.Culture.Parent.NativeName.ToUpper();
-                string code = lang.Culture.ToString();
-                int id = lang.Culture.KeyboardLayoutId;
-                //langTitles.Add(title);
-                //langCodes.Add(code);
-                inputLanguages.Add(lang);
-                Debug.WriteLine("Bar. title=" + title + ", code=" + code + ", id=" + id + ", hex=" +  id.ToString("X8"));
+                var title = lang.Culture.Parent.NativeName.ToUpper();
+                var code = lang.Culture.ToString();
+                var id = lang.Culture.KeyboardLayoutId;
+                _languages.Add(lang);
+                Debug.WriteLine("Bar. title=" + title + ", code=" + code + ", id=" + id + ", hex=" + id.ToString("X8"));
             }
 
-            InputLanguage currLang = InputLanguage.CurrentInputLanguage;
-            Debug.WriteLine("Bar. currLang=" + currLang.Culture);
-
-            pos = inputLanguages.IndexOf(currLang); // текущий язык
-            if (pos < inputLanguages.Count() - 1)
-                prev_index = pos + 1; 
-            else
-                prev_index = 0; // прошлый язык будет следующим в списке
-            Debug.WriteLine("Bar. pos=" + pos);
-            Debug.WriteLine("Bar. prev_index=" + prev_index);
+            _app = InitAppContext(appId);
+            Debug.WriteLine("Bar. Final context " + _app);
         }
 
-        public string GetHex()
+        public SwitchContext DoHide()
         {
-            Debug.WriteLine("getHex. retHex=" + retHex);
-            return retHex;
-        }
+            Debug.WriteLine("DoHide. Input " + _app);
+            var layoutId = _languages[_app.Curr].Culture.KeyboardLayoutId;
+            var layoutHex = layoutId.ToString("X8");
+            _app.Counter = 0;
 
-        public void DoHide()
-        {
-            //string langCode = inputLanguages[pos];
-            //Debug.WriteLine("DoHide. langCode=" + langCode);
+            var switchContext = new SwitchContext {LayoutId = layoutId, LayoutHex = layoutHex};
 
-            //int intValue = new CultureInfo(langCode).KeyboardLayoutId;
-            int intValue = inputLanguages[pos].Culture.KeyboardLayoutId;
-            Debug.WriteLine("DoHide. KeyboardLayoutId=" + intValue);
-
-            string hex = intValue.ToString("X8");
-            Debug.WriteLine("DoHide. hex=" + hex);
-
-            retHex = hex;
-            counter = 0;
             Hide();
+
+            Debug.WriteLine("DoHide. Output " + switchContext);
+
+            return switchContext;
         }
 
-        public void SetLanguage()
+        public void SwitchLanguage(IntPtr appId)
         {
-            counter++;
-            lblLanguage.Text = InputLanguage.CurrentInputLanguage.Culture.Parent.NativeName.ToUpper();
-            Debug.WriteLine("SetLanguage. TextOld=" + lblLanguage.Text);
-
-            if (counter == 1) // берем предыдущий
+            //Debug.WriteLine("SwitchLanguage. AppId " + appId);
+            if (_contexts.ContainsKey(appId))
             {
-                int t = prev_index;
-                prev_index = pos;
-                pos = t;
+                _app = _contexts[appId];
+                Debug.WriteLine("SwitchLanguage. Restored context " + _app);
             }
-            else // если нажали второй раз
+            else
             {
-                prev_index = pos;
-                if (pos > 0)
-                    pos -= 1;
+                _app = InitAppContext(appId);
+                Debug.WriteLine("SwitchLanguage. Created context " + _app);
+            }
+
+            lblLanguage.Text = _languages[_app.Curr].Culture.Parent.NativeName.ToUpper();
+            Debug.WriteLine("SwitchLanguage. Old language " + lblLanguage.Text);
+
+            _app.Counter++;
+            if (_app.Counter == 1) // Pick previous
+            {
+                var prevIndex = _app.Prev;
+                _app.Prev = _app.Curr;
+                _app.Curr = prevIndex;
+                Debug.WriteLine("SwitchLanguage. Case 1 " + _app);
+            }
+            else // Pressed second time, need to pick next in the list
+            {
+                _app.Prev = _app.Curr;
+                if (_app.Curr < _languages.Count - 1)
+                {
+                    _app.Curr += 1;
+                    Debug.WriteLine("SwitchLanguage. Case 2: " + _app);
+                }
                 else
-                    pos = inputLanguages.Count() - 1;
+                {
+                    _app.Curr = 0;
+                    Debug.WriteLine("SwitchLanguage. Case 3: " + _app);
+                }
             }
 
-            lblLanguage.Text = inputLanguages[pos].Culture.Parent.NativeName.ToUpper();
-            Debug.WriteLine("SetLanguage. TextNew=" + lblLanguage.Text);
+            lblLanguage.Text = _languages[_app.Curr].Culture.Parent.NativeName.ToUpper();
+            Debug.WriteLine("SwitchLanguage. New language " + lblLanguage.Text);
+        }
+
+        private AppLangContext InitAppContext(IntPtr appId)
+        {
+            Debug.WriteLine("InitAppContext. AppId " + appId);
+            InputLanguage currLang = Helper.GetKeyboardLanguage(appId);
+            Debug.WriteLine("InitAppContext. Keyboard language " + currLang.Culture.Parent.NativeName.ToUpper());
+
+            var context = new AppLangContext {AppId = appId, Curr = _languages.IndexOf(currLang)};
+            if (context.Curr == 0) // Edge case. I want next after default
+            {
+                context.Prev = 1;
+            }
+            else if (context.Curr < _languages.Count() - 1)
+            {
+                context.Prev = context.Curr - 1;
+            }
+            else
+            {
+                context.Prev = 0;
+            }
+
+            Debug.WriteLine("InitAppContext. Created context " + context);
+            _contexts.Add(appId, context);
+            return context;
         }
     }
 }

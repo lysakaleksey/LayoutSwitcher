@@ -8,38 +8,15 @@ namespace LayoutSwitcher
 {
     internal static class Program
     {
-        private const int HcAction = 0;
-        private const int WhKeyboardLl = 13;
+        private const int WmInputLangChangeRequest = 0x0050;
         private const int WmKeydown = 0x0100;
+        private const int WhKeyboardLl = 13;
         private const int WmKeyup = 0x0101;
+        private const int KlfActivate = 1;
+        private const int HcAction = 0;
         private static IntPtr _hookHandle = IntPtr.Zero;
-        private static Bar _bar;
         private static bool _kWin, _kSpace;
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, KbHook lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern bool PostMessage(IntPtr hhwnd, uint msg, IntPtr wparam, IntPtr lparam);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
-
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(Keys vKey);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        private static Bar _bar;
 
         [STAThread]
         private static void Main()
@@ -51,63 +28,51 @@ namespace LayoutSwitcher
                 using (var proc = Process.GetCurrentProcess())
                 using (var curModule = proc.MainModule)
                 {
-                    var moduleHandle = GetModuleHandle(curModule.ModuleName);
-                    _hookHandle = SetWindowsHookEx(WhKeyboardLl, IgnoreWin_Space, moduleHandle, 0);
+                    var moduleHandle = Helper.GetModuleHandle(curModule.ModuleName);
+                    _hookHandle = Helper.SetWindowsHookEx(WhKeyboardLl, IgnoreWin_Space, moduleHandle, 0);
                 }
-                _bar = new Bar();
-                BuildMenu();
+
+                var notifyIcon1 = new NotifyIcon();
+                var contextMenuStrip1 = new ContextMenuStrip();
+                var exitToolStripMenuItem = new ToolStripMenuItem();
+                exitToolStripMenuItem.Name = "exitToolStripMenuItem";
+                exitToolStripMenuItem.Size = new Size(155, 38);
+                exitToolStripMenuItem.Text = "Exit";
+                exitToolStripMenuItem.Click += ExitToolStripMenuItem_Click;
+                contextMenuStrip1.ImageScalingSize = new Size(32, 32);
+                contextMenuStrip1.Items.AddRange(new ToolStripItem[] {exitToolStripMenuItem});
+                contextMenuStrip1.Name = "contextMenuStrip1";
+                contextMenuStrip1.Size = new Size(156, 80);
+                notifyIcon1.ContextMenuStrip = contextMenuStrip1;
+                notifyIcon1.Icon = Properties.Resources.StatusIcon;
+                notifyIcon1.Text = "LayoutSwitcher";
+                notifyIcon1.Visible = true;
+
+                var appId = Helper.GetForegroundWindow();
+                _bar = new Bar(appId);
                 Application.Run();
             }
             finally
             {
-                UnhookWindowsHookEx(_hookHandle);
+                Helper.UnhookWindowsHookEx(_hookHandle);
             }
         }
 
-        private static void BuildMenu()
-        {
-            NotifyIcon notifyIcon1 = new NotifyIcon();
-            ContextMenuStrip contextMenuStrip1 = new ContextMenuStrip();
-            ToolStripMenuItem exitToolStripMenuItem = new ToolStripMenuItem();
-            // 
-            // exitToolStripMenuItem
-            // 
-            exitToolStripMenuItem.Name = "exitToolStripMenuItem";
-            exitToolStripMenuItem.Size = new Size(155, 38);
-            exitToolStripMenuItem.Text = "Exit";
-            exitToolStripMenuItem.Click += new EventHandler(ExitToolStripMenuItem_Click);
-            // 
-            // contextMenuStrip1
-            // 
-            contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(32, 32);
-            contextMenuStrip1.Items.AddRange(new ToolStripItem[] {exitToolStripMenuItem});
-            contextMenuStrip1.Name = "contextMenuStrip1";
-            contextMenuStrip1.Size = new Size(156, 80);
-            // 
-            // notifyIcon1
-            // 
-            notifyIcon1.ContextMenuStrip = contextMenuStrip1;
-            notifyIcon1.Icon = Properties.Resources.StatusIcon;
-            notifyIcon1.Text = "LayoutSwitcher";
-            notifyIcon1.Visible = true;
-        }
-
-        static void ExitToolStripMenuItem_Click(object sender, EventArgs e)
+        private static void ExitToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Application.Exit();
         }
 
-
-        static IntPtr IgnoreWin_Space(int nCode, IntPtr wParam, IntPtr lParam)
+        private static IntPtr IgnoreWin_Space(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            bool spacePressed = false;
-            var keyInfo = (KbHookParam)Marshal.PtrToStructure(lParam, typeof(KbHookParam));
+            var spacePressed = false;
+            var keyInfo = (KbHookParam) Marshal.PtrToStructure(lParam, typeof(KbHookParam));
 
             if (nCode == HcAction)
             {
-                if ((int)wParam == WmKeydown)
+                if ((int) wParam == WmKeydown)
                 {
-                    if (keyInfo.VkCode == (int)Keys.Space)
+                    if (keyInfo.VkCode == (int) Keys.Space)
                     {
                         spacePressed = true;
                         _kSpace = true;
@@ -117,44 +82,38 @@ namespace LayoutSwitcher
                         _kSpace = false;
                     }
 
-                    // нажат одновременно левый виндовс
-                    if (GetAsyncKeyState(Keys.LWin) < 0)
-                    {
-                        _kWin = true;
-                    }
-                    else
-                    {
-                        _kWin = false;
-                    }
-
+                    _kWin = Helper.GetAsyncKeyState(Keys.LWin) < 0 || Helper.GetAsyncKeyState(Keys.RWin) < 0;
                     if (_kWin && _kSpace)
                     {
                         if (spacePressed)
                         {
-                            _bar.SetLanguage();
-                            _bar.Show(); // сбивает фокус, пофиксим в конструкторе
-                            return (IntPtr)1; //just ignore the key press
+                            Debug.WriteLine("Program. Left Win + Space pressed");
+                            var appId = Helper.GetForegroundWindow();
+                            _bar.SwitchLanguage(appId);
+                            _bar.Show();
+                            return (IntPtr) 1; //just ignore the key press
                         }
                     }
                 }
             }
-            if ((int)wParam == WmKeyup)
+
+            if ((int) wParam == WmKeyup)
             {
-                if (keyInfo.VkCode == (int)Keys.LWin)
+                if (keyInfo.VkCode == (int) Keys.LWin || keyInfo.VkCode == (int) Keys.RWin)
                 {
                     _kWin = false;
-                    _bar.DoHide();
-                    var hex = _bar.GetHex();
-                    const uint wmInputLangChangeRequest = 0x0050;
-                    const uint KLF_ACTIVATE = 1;
-                    PostMessage(GetForegroundWindow(), wmInputLangChangeRequest, IntPtr.Zero, LoadKeyboardLayout(hex, KLF_ACTIVATE));
+                    if (_bar.Visible)
+                    {
+                        var switchContext = _bar.DoHide();
+                        var layout = Helper.LoadKeyboardLayout(switchContext.LayoutHex, KlfActivate);
+                        Helper.PostMessage(Helper.GetForegroundWindow(), WmInputLangChangeRequest, IntPtr.Zero, layout);
+                        Debug.WriteLine("Program. Changed Keyboard Language " + switchContext);
+                    }
                 }
             }
 
-            return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+            return Helper.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
         }
-
-        private delegate IntPtr KbHook(int nCode, IntPtr wParam, [In] IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
         private readonly struct KbHookParam
