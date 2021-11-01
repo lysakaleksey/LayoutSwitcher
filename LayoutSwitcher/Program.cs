@@ -28,8 +28,11 @@ namespace LayoutSwitcher
                 using (var proc = Process.GetCurrentProcess())
                 using (var curModule = proc.MainModule)
                 {
-                    var moduleHandle = Helper.GetModuleHandle(curModule.ModuleName);
-                    _hookHandle = Helper.SetWindowsHookEx(WhKeyboardLl, IgnoreWin_Space, moduleHandle, 0);
+                    if (curModule != null)
+                    {
+                        var moduleHandle = Helper.GetModuleHandle(curModule.ModuleName);
+                        _hookHandle = Helper.SetWindowsHookEx(WhKeyboardLl, IgnoreWin_Space, moduleHandle, 0);
+                    }
                 }
 
                 var notifyIcon1 = new NotifyIcon();
@@ -82,7 +85,7 @@ namespace LayoutSwitcher
                         _kSpace = false;
                     }
 
-                    _kWin = Helper.GetAsyncKeyState(Keys.LWin) < 0 || Helper.GetAsyncKeyState(Keys.RWin) < 0;
+                    _kWin = Helper.GetAsyncKeyState(Keys.LControlKey) < 0 & Helper.GetAsyncKeyState(Keys.LShiftKey) < 0;
                     if (_kWin && _kSpace)
                     {
                         if (spacePressed)
@@ -103,7 +106,7 @@ namespace LayoutSwitcher
 
             if ((int) wParam == WmKeyup)
             {
-                if (keyInfo.VkCode == (int) Keys.LWin || keyInfo.VkCode == (int) Keys.RWin)
+                if (keyInfo.VkCode == (int) Keys.LControlKey)
                 {
                     _kWin = false;
                     var layoutHex = _bar.DoHide();
